@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
+use std::vec::IntoIter;
 
 pub struct Config {
     pub sources: Option<Vec<io::Result<PathBuf>>>,
@@ -19,7 +20,7 @@ impl Config {
         let mut iter = args.iter();
         iter.next();
 
-        for _ in 1..total_args {
+        for _ in 1..total_args-1 {
             let arg = match iter.next() {
                 Some(str) => PathBuf::from(str),
                 None => return Err(String::from("`source` received arg with value `None`")),
@@ -42,7 +43,8 @@ impl Config {
 }
 
 pub fn recursive_copy(
-    mut sources: impl Iterator<Item = io::Result<PathBuf>>,
+    //mut sources: impl Iterator<Item = io::Result<PathBuf>>,
+    mut sources: IntoIter<io::Result<PathBuf>>,
     target_dir: PathBuf,
 ) -> io::Result<()> {
     while let Some(source) = sources.next() {
@@ -58,10 +60,11 @@ pub fn recursive_copy(
         next_target.push(source_name);
 
         if source.is_dir() {
-            let dir_contents = source
+            let dir_contents: Vec<io::Result<PathBuf>> = source
                 .read_dir()?
-                .map(|entry| io::Result::Ok(entry?.path()));
-            recursive_copy(dir_contents, next_target)?;
+                .map(|entry| io::Result::Ok(entry?.path()))
+                .collect();
+            recursive_copy(dir_contents.into_iter(), next_target)?;
         } else if source.is_file() {
             if !target_dir.try_exists()? {
                 let mut builder = fs::DirBuilder::new();
