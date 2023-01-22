@@ -6,53 +6,38 @@
  * just doing this to get better with Rust.
  *
  */
-
-use std::io::{self, Read, Write};
-use std::path;
-use std::{env, fs, process};
+use rust_copy;
+use std::{env, io, process};
 
 fn main() {
-    let config = Config::build(env::args()).unwrap_or_else(|error| {
-        eprintln!("Usage: rust_copy source target");
+    let config = rust_copy::Config::build(env::args().collect()).unwrap_or_else(|error| {
+        eprintln!("Usage: rust_copy source_a [source_b, ...] target");
         eprintln!("config build error: {}", error);
         eprintln!("env args: {:?}", env::args());
         process::exit(1);
     });
-    action(config).unwrap_or_else(|error| {
+
+    run(config).unwrap_or_else(|error| {
         eprintln!("IO error occurred during execution: {:?}", error);
         process::exit(1);
     });
 }
 
-fn action(config: Config) -> io::Result<()> {
-    let mut contents: Vec<u8> = vec![];
-    fs::File::open(config.source)?.read_to_end(&mut contents)?;
-    fs::File::create(config.target)?.write(&contents)?;
-    Ok(())
-}
-
-struct Config {
-    source: path::PathBuf,
-    target: path::PathBuf,
-}
-
-impl Config {
-    fn build(mut args: impl Iterator<Item = String>) -> Result<Self, String> {
-        args.next();
-        let source = match args.next() {
-            Some(str) => match path::PathBuf::from(str).canonicalize() {
+fn run(mut config: rust_copy::Config) -> io::Result<()> {
+    let mut sources = config
+        .sources
+        .take()
+        .expect("sources was `None`")
+        .into_iter();
+    let target = config.target.take().expect("target was `None`");
+    match config.target_isdir {
+        true => rust_copy::recursive_copy(sources, target),
+        false => {
+            let source_file = match sources.next().expect("expected filename") {
                 Ok(val) => val,
-                Err(e) => return Err(e.to_string()),
-            },
-            None => return Err(String::from("missing required argument `source`")),
-        };
-        let target = match args.next() {
-            Some(str) => path::PathBuf::from(str),
-            None => return Err(String::from("missing required argument `target`")),
-        };
-
-
-
-        Ok(Self { source, target })
+                Err(e) => panic!("shouldn't be able to reach here: {:?}", e.to_string()),
+            };
+            rust_copy::copy(source_file, target)
+        }
     }
 }
