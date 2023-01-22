@@ -43,7 +43,6 @@ impl Config {
 }
 
 pub fn recursive_copy(
-    //mut sources: impl Iterator<Item = io::Result<PathBuf>>,
     mut sources: IntoIter<io::Result<PathBuf>>,
     target_dir: PathBuf,
 ) -> io::Result<()> {
